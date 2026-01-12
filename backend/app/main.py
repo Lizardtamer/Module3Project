@@ -1,18 +1,32 @@
-from typing import List
-from fastapi import FastAPI, Depends, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.orm import Session
-from app.database import SessionLocal, engine, Base, get_db
-from app.models import Character, Class, Weapon
 from app.schemas import (
     CharacterCreate, CharacterUpdate, CharacterOut, CharacterDetailed,
     ClassOut, WeaponOut
 )
+from app.models import Character, Class, Weapon
+from typing import List
+from fastapi import FastAPI, Depends, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
+from pydantic import BaseModel
+from openai import OpenAI
+from dotenv import load_dotenv
+from app.database import SessionLocal, engine, Base, get_db
+
+# Load environment variables
+load_dotenv()
 
 # Create tables
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Adventure API")
+
+# OpenAI client
+openai_client = OpenAI()
+
+
+class ChatRequest(BaseModel):
+    message: str
+
 
 # CORS middleware for frontend communication
 app.add_middleware(
@@ -159,3 +173,20 @@ def delete_character(character_id: int, db: Session = Depends(get_db)):
 @app.get("/")
 def root():
     return {"message": "Adventure API is running"}
+
+# ===== ChatGPT Demo Endpoint =====
+
+
+@app.post("/api/chat")
+def chat(request: ChatRequest):
+    """Simple ChatGPT proof of concept endpoint"""
+    try:
+        response = openai_client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "user", "content": request.message}
+            ]
+        )
+        return {"response": response.choices[0].message.content}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
